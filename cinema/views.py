@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from django.db.models import F, Count
-from rest_framework import viewsets, mixins
+from rest_framework import viewsets, mixins, serializers
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
 
@@ -64,8 +64,23 @@ class MovieViewSet(
 
     @staticmethod
     def _params_to_ints(qs):
-        """Converts a list of string IDs to a list of integers"""
-        return [int(str_id) for str_id in qs.split(",")]
+        if not qs:
+            return []
+        str_ids = [s.strip() for s in qs.split(",")]
+        ints = []
+        invalid = []
+        for s in str_ids:
+            if not s:
+                continue
+            try:
+                ints.append(int(s))
+            except ValueError:
+                invalid.append(s)
+        if invalid:
+            raise serializers.ValidationError(
+                {"ids": f"Invalid id values: {', '.join(invalid)}. Expected integers."}
+            )
+        return ints
 
     def get_queryset(self):
         """Retrieve the movies with filters"""
@@ -118,11 +133,22 @@ class MovieSessionViewSet(viewsets.ModelViewSet):
         queryset = self.queryset
 
         if date:
-            date = datetime.strptime(date, "%Y-%m-%d").date()
+            try:
+                date = datetime.strptime(date, "%Y-%m-%d").date()
+            except (ValueError, TypeError):
+                raise serializers.ValidationError(
+                    {"date": "Invalid date format. Expected YYYY-MM-DD."}
+                )
             queryset = queryset.filter(show_time__date=date)
 
         if movie_id_str:
-            queryset = queryset.filter(movie_id=int(movie_id_str))
+            try:
+                movie_id = int(movie_id_str)
+            except ValueError:
+                raise serializers.ValidationError(
+                    {"movie": "Invalid movie id. Expected integer."}
+                )
+            queryset = queryset.filter(movie_id=movie_id)
 
         return queryset
 
@@ -151,10 +177,10 @@ class OrderViewSet(
     )
     serializer_class = OrderSerializer
     pagination_class = OrderPagination
-    permission_classes = (IsAuthenticated,)
+    permission_classes = (IsAdminOrIfAuthenticatedReadOnly,)
 
     def get_queryset(self):
-        return Order.objects.filter(user=self.request.user)
+        return self.queryset.filter(user=self.request.user)
 
     def get_serializer_class(self):
         if self.action == "list":
