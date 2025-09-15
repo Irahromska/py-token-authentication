@@ -66,16 +66,16 @@ class MovieViewSet(
     def _params_to_ints(qs):
         if not qs:
             return []
-        str_ids = [s.strip() for s in qs.split(",")]
+        str_ids = [part.strip() for part in qs.split(",")]
         ints = []
         invalid = []
-        for s in str_ids:
-            if not s:
+        for str_id in str_ids:
+            if not str_id:
                 continue
             try:
-                ints.append(int(s))
+                ints.append(int(str_id))
             except ValueError:
-                invalid.append(s)
+                invalid.append(str_id)
         if invalid:
             raise serializers.ValidationError(
                 {"ids": f"Invalid id values: {', '.join(invalid)}. Expected integers."}
