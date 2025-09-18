@@ -3,7 +3,6 @@ from datetime import datetime
 from django.db.models import F, Count
 from rest_framework import viewsets, mixins, serializers
 from rest_framework.pagination import PageNumberPagination
-from rest_framework.permissions import IsAuthenticated
 
 from cinema.models import Genre, Actor, CinemaHall, Movie, MovieSession, Order
 from cinema.permissions import IsAdminOrIfAuthenticatedReadOnly
@@ -78,38 +77,30 @@ class MovieViewSet(
                 invalid.append(str_id)
         if invalid:
             raise serializers.ValidationError(
-                {"ids": f"Invalid id values: {', '.join(invalid)}. Expected integers."}
+                {"ids": f"Invalid id values: {', '.join(invalid)}."}
             )
         return ints
 
     def get_queryset(self):
-        """Retrieve the movies with filters"""
         title = self.request.query_params.get("title")
         genres = self.request.query_params.get("genres")
         actors = self.request.query_params.get("actors")
-
         queryset = self.queryset
-
         if title:
             queryset = queryset.filter(title__icontains=title)
-
         if genres:
             genres_ids = self._params_to_ints(genres)
             queryset = queryset.filter(genres__id__in=genres_ids)
-
         if actors:
             actors_ids = self._params_to_ints(actors)
             queryset = queryset.filter(actors__id__in=actors_ids)
-
         return queryset.distinct()
 
     def get_serializer_class(self):
         if self.action == "list":
             return MovieListSerializer
-
         if self.action == "retrieve":
             return MovieDetailSerializer
-
         return MovieSerializer
 
 
@@ -129,9 +120,7 @@ class MovieSessionViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         date = self.request.query_params.get("date")
         movie_id_str = self.request.query_params.get("movie")
-
         queryset = self.queryset
-
         if date:
             try:
                 date = datetime.strptime(date, "%Y-%m-%d").date()
@@ -140,7 +129,6 @@ class MovieSessionViewSet(viewsets.ModelViewSet):
                     {"date": "Invalid date format. Expected YYYY-MM-DD."}
                 )
             queryset = queryset.filter(show_time__date=date)
-
         if movie_id_str:
             try:
                 movie_id = int(movie_id_str)
@@ -149,16 +137,13 @@ class MovieSessionViewSet(viewsets.ModelViewSet):
                     {"movie": "Invalid movie id. Expected integer."}
                 )
             queryset = queryset.filter(movie_id=movie_id)
-
         return queryset
 
     def get_serializer_class(self):
         if self.action == "list":
             return MovieSessionListSerializer
-
         if self.action == "retrieve":
             return MovieSessionDetailSerializer
-
         return MovieSessionSerializer
 
 
@@ -173,7 +158,8 @@ class OrderViewSet(
     viewsets.GenericViewSet
 ):
     queryset = Order.objects.prefetch_related(
-        "tickets__movie_session__movie", "tickets__movie_session__cinema_hall"
+        "tickets__movie_session__movie",
+        "tickets__movie_session__cinema_hall"
     )
     serializer_class = OrderSerializer
     pagination_class = OrderPagination
@@ -185,7 +171,6 @@ class OrderViewSet(
     def get_serializer_class(self):
         if self.action == "list":
             return OrderListSerializer
-
         return OrderSerializer
 
     def perform_create(self, serializer):
